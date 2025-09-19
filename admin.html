@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - ComradeArchives</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="index.html"><i class="fas fa-home me-2"></i>ComradeArchives</a>
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link" href="businesses.html"><i class="fas fa-store me-1"></i>Businesses</a>
+        <a class="nav-link" href="login.html"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container my-5">
+    <h2 class="text-center mb-4 fade-in"><i class="fas fa-cog me-2"></i>Admin Dashboard</h2>
+    <button class="btn btn-success mb-3 hover-scale" data-bs-toggle="modal" data-bs-target="#addModal"><i class="fas fa-plus me-2"></i>Add Business</button>
+    <table class="table table-striped fade-in">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="adminTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Add Modal -->
+  <div class="modal fade" id="addModal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add Business</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="addForm">
+            <div class="mb-3"><input type="text" class="form-control" id="addName" placeholder="Name" required></div>
+            <div class="mb-3"><input type="text" class="form-control" id="addCategory" placeholder="Category" required></div>
+            <div class="mb-3"><input type="text" class="form-control" id="addDesc" placeholder="Description"></div>
+            <div class="mb-3"><input type="text" class="form-control" id="addContact" placeholder="Contact" required></div>
+            <div class="mb-3"><input type="text" class="form-control" id="addMenu" placeholder='Menu JSON e.g. [{"name":"Coffee","price":100}]'></div>
+            <button type="submit" class="btn btn-primary">Add</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API = 'http://localhost:5000/api';
+    const token = localStorage.getItem('token');
+    if (!token || !JSON.parse(atob(token.split('.')[1])).role === 'admin') window.location.href = 'login.html';
+
+    async function loadAdmin() {
+      const res = await fetch(`${API}/admin/businesses`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const businesses = await res.json();
+      const tbody = document.getElementById('adminTable');
+      tbody.innerHTML = '';
+      businesses.forEach(b => {
+        tbody.innerHTML += `
+          <tr class="fade-in">
+            <td>${b.id}</td>
+            <td>${b.name}</td>
+            <td>${b.category}</td>
+            <td><span class="badge status-${b.status}">${b.status}</span></td>
+            <td>
+              <button class="btn btn-sm btn-warning me-1 hover-scale" onclick="updateBiz('${b.id}')"><i class="fas fa-edit"></i></button>
+              <button class="btn btn-sm btn-info me-1 hover-scale" onclick="toggleStatus('${b.id}', 'paused')"><i class="fas fa-pause"></i></button>
+              <button class="btn btn-sm btn-secondary me-1 hover-scale" onclick="toggleStatus('${b.id}', 'hidden')"><i class="fas fa-eye-slash"></i></button>
+              <button class="btn btn-sm btn-success me-1 hover-scale" onclick="toggleStatus('${b.id}', 'active')"><i class="fas fa-eye"></i></button>
+              <button class="btn btn-sm btn-danger hover-scale" onclick="delBiz('${b.id}')"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = {
+        name: document.getElementById('addName').value,
+        category: document.getElementById('addCategory').value,
+        description: document.getElementById('addDesc').value,
+        contact: document.getElementById('addContact').value,
+        menu: document.getElementById('addMenu').value ? JSON.parse(document.getElementById('addMenu').value) : []
+      };
+      await fetch(`${API}/admin/businesses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+      bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+      loadAdmin();
+    });
+
+    async function updateBiz(id) {
+      const updates = prompt('Updates JSON (e.g. {"description":"New","menu":[...]})');
+      if (updates) {
+        await fetch(`${API}/admin/businesses/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: updates
+        });
+        loadAdmin();
+      }
+    }
+
+    async function toggleStatus(id, status) {
+      await fetch(`${API}/admin/businesses/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+      loadAdmin();
+    }
+
+    async function delBiz(id) {
+      if (confirm('Delete?')) {
+        await fetch(`${API}/admin/businesses/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        loadAdmin();
+      }
+    }
+
+    loadAdmin();
+  </script>
+</body>
+</html>
