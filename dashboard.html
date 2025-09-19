@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - ComradeArchives</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="index.html"><i class="fas fa-home me-2"></i>ComradeArchives</a>
+      <div class="navbar-nav ms-auto">
+        <a class="nav-link" href="businesses.html"><i class="fas fa-store me-1"></i>Businesses</a>
+        <a class="nav-link" href="login.html"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container my-5">
+    <h2 id="dashTitle" class="text-center mb-4 fade-in"><i class="fas fa-tachometer-alt me-2"></i>Your Dashboard</h2>
+    <div id="dashContent"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API = 'http://localhost:5000/api';
+    const token = localStorage.getItem('token');
+    if (!token) window.location.href = 'login.html';
+
+    const decoded = JSON.parse(atob(token.split('.')[1])); // Decode JWT payload
+    const role = decoded.role;
+
+    document.getElementById('dashTitle').innerHTML += ` - ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+
+    async function loadDashboard() {
+      const content = document.getElementById('dashContent');
+      if (role === 'student') {
+        content.innerHTML = '<p class="fade-in">Track your orders here (dynamic from orders sheet).</p>';
+      } else if (role === 'business') {
+        const res = await fetch(`${API}/businesses`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const myBiz = (await res.json()).filter(b => b.ownerId === decoded.id)[0];
+        content.innerHTML = myBiz ? `
+          <div class="card fade-in">
+            <div class="card-body">
+              <h5><i class="fas fa-store me-2"></i>${myBiz.name}</h5>
+              <p>Status: <span class="status-${myBiz.status}">${myBiz.status}</span></p>
+              <button class="btn btn-primary hover-scale" onclick="updateMyBiz('${myBiz.id}')">Update Menu/Services</button>
+            </div>
+          </div>
+        ` : '<p class="fade-in">Create your business profile <a href="businesses.html">here</a>.</p>';
+      } else if (role === 'delivery') {
+        content.innerHTML = '<p class="fade-in">View delivery jobs (dynamic).</p>';
+      }
+    }
+
+    function updateMyBiz(id) {
+      const updates = prompt('Updates JSON e.g. {"menu": [{"name":"New","price":50}]}');
+      if (updates) {
+        fetch(`${API}/businesses/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: updates
+        }).then(() => location.reload());
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
